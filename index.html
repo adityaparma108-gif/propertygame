@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Business Game</title>
+  <style>
+    body { font-family: Arial; text-align: center; }
+    input { padding: 10px; margin: 5px; }
+    button { padding: 10px; }
+    #game { display: none; }
+  </style>
+</head>
+<body>
+
+<h1>Login</h1>
+
+<input type="text" id="email" placeholder="Email"><br>
+<input type="password" id="password" placeholder="Password"><br>
+<button onclick="login()">Login</button>
+
+<h2 id="status"></h2>
+
+<div id="game">
+  <h1>Welcome to Business Game 🎮</h1>
+  <p id="playerName"></p>
+
+  <button onclick="rollDice()">Roll Dice 🎲</button>
+  <p id="diceResult"></p>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAjF0JU3E2OrDBrdhfiWDkpe9-6XMC6iNw",
+  authDomain: "robot-920c8.firebaseapp.com",
+  databaseURL: "https://robot-920c8-default-rtdb.firebaseio.com",
+  projectId: "robot-920c8",
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+function login() {
+  let email = document.getElementById("email").value.trim();
+  let password = document.getElementById("password").value.trim();
+
+  db.ref("accounts").once("value", snapshot => {
+    let found = false;
+
+    snapshot.forEach(child => {
+      let data = child.val();
+
+      console.log(data); // DEBUG
+
+      if (data.email === email && data.password === password) {
+        found = true;
+
+        document.getElementById("status").innerText = "Login Success ✅";
+        document.getElementById("game").style.display = "block";
+      }
+    });
+
+    if (!found) {
+      document.getElementById("status").innerText = "Wrong login ❌";
+    }
+  });
+}
+}
+
+function rollDice() {
+  let num = Math.floor(Math.random() * 6) + 1;
+  document.getElementById("diceResult").innerText = "You got: " + num;
+}
+</script>
+
+</body>
+</html>
