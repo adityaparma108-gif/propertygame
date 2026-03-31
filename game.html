@@ -1,67 +1,196 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Business Game</title>
+  <title>Pro Property Game</title>
+
+  <style>
+    body { font-family: Arial; text-align: center; background:#111; color:white; }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, 80px);
+      gap: 8px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .tile {
+      width: 80px;
+      height: 80px;
+      background: #333;
+      border-radius: 10px;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      font-size:10px;
+    }
+
+    .player {
+      font-size: 12px;
+      color: yellow;
+    }
+
+    button {
+      padding:10px;
+      margin:5px;
+      border:none;
+      border-radius:10px;
+      background:#4CAF50;
+      color:white;
+    }
+  </style>
+
 </head>
 
-<body style="text-align:center; font-family:Arial;">
+<body>
 
-<h1>🏦 Business Property Game</h1>
-
+<h1>🏦 PRO PROPERTY GAME</h1>
 <h3 id="playerName"></h3>
 
-<button onclick="joinGame()">Join Game</button>
+<button onclick="joinGame()">Join</button>
+<button onclick="rollDice()">🎲 Roll</button>
+<button onclick="buyProperty()">🏠 Buy</button>
 
-<h2>Players:</h2>
-<ul id="playersList"></ul>
+<h3 id="turnText"></h3>
+
+<div class="board" id="board"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, set, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-// 🔥 SAME FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
+  apiKey: "AIzaSyAjF0JU3E2OrDBrdhfiWDkpe9-6XMC6iNw",
   authDomain: "robot-920c8.firebaseapp.com",
   databaseURL: "https://robot-920c8-default-rtdb.firebaseio.com",
-  projectId: "robot-920c8",
-  storageBucket: "robot-920c8.appspot.com",
-  messagingSenderId: "XXXX",
-  appId: "XXXX"
+  projectId: "robot-920c8"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ✅ Get logged in player
 const player = localStorage.getItem("player");
-
 document.getElementById("playerName").innerText = "Player: " + player;
 
-// ✅ Join Game
+// 🗺️ BOARD DATA
+const cities = [
+  "Start","Mumbai","Delhi","Tax","Bangalore",
+  "Chennai","Jail","Kolkata","Hyderabad","Bonus",
+  "Pune","Jaipur","Lucknow","Tax","Goa",
+  "Indore","Nagpur","Bonus","Surat","End"
+];
+
+// DRAW BOARD
+const boardDiv = document.getElementById("board");
+cities.forEach((city,i)=>{
+  let d = document.createElement("div");
+  d.className="tile";
+  d.id="tile"+i;
+  d.innerHTML = city;
+  boardDiv.appendChild(d);
+});
+
+// JOIN GAME
 window.joinGame = function () {
-  set(ref(db, "players/" + player), {
-    name: player,
-    money: 1000,
-    position: 0
+  set(ref(db,"players/"+player),{
+    name:player,
+    money:5000,
+    position:0
   });
+
+  set(ref(db,"turn"), player);
 };
 
-// ✅ Show all players LIVE
-onValue(ref(db, "players"), (snapshot) => {
-  const list = document.getElementById("playersList");
-  list.innerHTML = "";
+// 🎲 ROLL WITH TURN SYSTEM
+window.rollDice = async function () {
+  const turnSnap = await get(ref(db,"turn"));
 
-  if (snapshot.exists()) {
-    const data = snapshot.val();
+  if(turnSnap.val() !== player){
+    alert("Not your turn!");
+    return;
+  }
 
-    for (let key in data) {
-      const li = document.createElement("li");
-      li.innerText = data[key].name + " - ₹" + data[key].money;
-      list.appendChild(li);
+  let dice = Math.floor(Math.random()*6)+1;
+
+  const snap = await get(ref(db,"players/"+player));
+  let p = snap.val();
+
+  let newPos = (p.position + dice) % cities.length;
+
+  await update(ref(db,"players/"+player),{
+    position:newPos
+  });
+
+  checkProperty(newPos);
+
+  // NEXT TURN
+  const all = await get(ref(db,"players"));
+  let keys = Object.keys(all.val());
+  let next = keys[(keys.indexOf(player)+1)%keys.length];
+
+  set(ref(db,"turn"), next);
+};
+
+// 🏠 BUY
+window.buyProperty = async function () {
+  const snap = await get(ref(db,"players/"+player));
+  let p = snap.val();
+  let pos = p.position;
+
+  const propSnap = await get(ref(db,"properties/"+pos));
+
+  if(!propSnap.exists() && p.money >= 500){
+    await set(ref(db,"properties/"+pos),{
+      owner:player
+    });
+
+    await update(ref(db,"players/"+player),{
+      money:p.money - 500
+    });
+
+    alert("Bought " + cities[pos]);
+  }
+};
+
+// 💰 RENT
+async function checkProperty(pos){
+  const propSnap = await get(ref(db,"properties/"+pos));
+
+  if(propSnap.exists()){
+    let prop = propSnap.val();
+
+    if(prop.owner !== player){
+      alert("Pay Rent ₹200");
+
+      const snap = await get(ref(db,"players/"+player));
+      let p = snap.val();
+
+      await update(ref(db,"players/"+player),{
+        money:p.money - 200
+      });
     }
   }
+}
+
+// 🔄 LIVE UPDATE
+onValue(ref(db,"players"), (snap)=>{
+  document.querySelectorAll(".tile").forEach(t=>t.style.background="#333");
+
+  let data = snap.val();
+
+  for(let k in data){
+    let p = data[k];
+    let tile = document.getElementById("tile"+p.position);
+
+    tile.innerHTML = cities[p.position] + "<br><span class='player'>●</span>";
+  }
 });
+
+// 🟢 SHOW TURN
+onValue(ref(db,"turn"), (snap)=>{
+  document.getElementById("turnText").innerText = "Turn: " + snap.val();
+});
+
 </script>
 
 </body>
