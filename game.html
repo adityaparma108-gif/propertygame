@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Business Game</title>
+</head>
+
+<body style="text-align:center; font-family:Arial;">
+
+<h1>🏦 Business Property Game</h1>
+
+<h3 id="playerName"></h3>
+
+<button onclick="joinGame()">Join Game</button>
+
+<h2>Players:</h2>
+<ul id="playersList"></ul>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// 🔥 SAME FIREBASE CONFIG
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "robot-920c8.firebaseapp.com",
+  databaseURL: "https://robot-920c8-default-rtdb.firebaseio.com",
+  projectId: "robot-920c8",
+  storageBucket: "robot-920c8.appspot.com",
+  messagingSenderId: "XXXX",
+  appId: "XXXX"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ✅ Get logged in player
+const player = localStorage.getItem("player");
+
+document.getElementById("playerName").innerText = "Player: " + player;
+
+// ✅ Join Game
+window.joinGame = function () {
+  set(ref(db, "players/" + player), {
+    name: player,
+    money: 1000,
+    position: 0
+  });
+};
+
+// ✅ Show all players LIVE
+onValue(ref(db, "players"), (snapshot) => {
+  const list = document.getElementById("playersList");
+  list.innerHTML = "";
+
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+
+    for (let key in data) {
+      const li = document.createElement("li");
+      li.innerText = data[key].name + " - ₹" + data[key].money;
+      list.appendChild(li);
+    }
+  }
+});
+</script>
+
+</body>
+</html>
