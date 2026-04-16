@@ -102,33 +102,29 @@ window.joinGame = function () {
 };
 
 // 🎲 ROLL WITH TURN SYSTEM
-window.rollDice = async function () {
-  const turnSnap = await get(ref(db,"turn"));
+window.joinGame = async function () {
 
-  if(turnSnap.val() !== player){
-    alert("Not your turn!");
+  if(!player){
+    alert("Login missing!");
     return;
   }
 
-  let dice = Math.floor(Math.random()*6)+1;
+  alert("Joining game...");
 
-  const snap = await get(ref(db,"players/"+player));
-  let p = snap.val();
-
-  let newPos = (p.position + dice) % cities.length;
-
-  await update(ref(db,"players/"+player),{
-    position:newPos
+  await set(ref(db,"players/"+player),{
+    name:player,
+    money:5000,
+    position:0
   });
 
-  checkProperty(newPos);
+  // FIX: set turn only if not exists
+  const turnSnap = await get(ref(db,"turn"));
 
-  // NEXT TURN
-  const all = await get(ref(db,"players"));
-  let keys = Object.keys(all.val());
-  let next = keys[(keys.indexOf(player)+1)%keys.length];
+  if(!turnSnap.exists()){
+    await set(ref(db,"turn"), player);
+  }
 
-  set(ref(db,"turn"), next);
+  alert("Joined successfully!");
 };
 
 // 🏠 BUY
