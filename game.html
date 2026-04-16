@@ -184,9 +184,14 @@ onValue(ref(db,"players"), (snap)=>{
 
 // 🟢 SHOW TURN
 onValue(ref(db,"turn"), (snap)=>{
-  document.getElementById("turnText").innerText = "Turn: " + snap.val();
-});
+  let turn = snap.val();
 
+  if(!turn){
+    document.getElementById("turnText").innerText = "Waiting for players...";
+  } else {
+    document.getElementById("turnText").innerText = "Turn: " + turn;
+  }
+});
 </script>
 
 </body>
