@@ -25,11 +25,6 @@
       font-size:10px;
     }
 
-    .player {
-      font-size: 12px;
-      color: yellow;
-    }
-
     button {
       padding:10px;
       margin:5px;
@@ -39,7 +34,6 @@
       color:white;
     }
   </style>
-
 </head>
 
 <body>
@@ -51,17 +45,17 @@
 <button onclick="rollDice()">🎲 Roll</button>
 <button onclick="buyProperty()">🏠 Buy</button>
 
-<h3 id="turnText"></h3>
+<h3 id="turnText">Waiting...</h3>
 
 <div class="board" id="board"></div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
-  
+import { getDatabase, ref, set, onValue, get, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAjF0JU3E2OrDBrdhfiWDkpe9-6XMC6iNw",
+  apiKey: "PASTE_YOUR_API_KEY",
   authDomain: "robot-920c8.firebaseapp.com",
   databaseURL: "https://robot-920c8-default-rtdb.firebaseio.com",
   projectId: "robot-920c8"
@@ -69,20 +63,17 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-// 🔄 TURN LISTENER (ADD HERE)
-onValue(ref(db, "turn"), (snapshot) => {
-  const turn = snapshot.val();
 
-  if (turn) {
-    document.getElementById("turnText").innerText = "Turn: " + turn;
-  } else {
-    document.getElementById("turnText").innerText = "Waiting for players...";
-  }
-});
 const player = localStorage.getItem("player");
 document.getElementById("playerName").innerText = "Player: " + player;
 
-// 🗺️ BOARD DATA
+// TURN LISTENER
+onValue(ref(db, "turn"), (snap) => {
+  const turn = snap.val();
+  document.getElementById("turnText").innerText = turn ? "Turn: " + turn : "Waiting...";
+});
+
+// BOARD
 const cities = [
   "Start","Mumbai","Delhi","Tax","Bangalore",
   "Chennai","Jail","Kolkata","Hyderabad","Bonus",
@@ -90,7 +81,6 @@ const cities = [
   "Indore","Nagpur","Bonus","Surat","End"
 ];
 
-// DRAW BOARD
 const boardDiv = document.getElementById("board");
 cities.forEach((city,i)=>{
   let d = document.createElement("div");
@@ -100,39 +90,7 @@ cities.forEach((city,i)=>{
   boardDiv.appendChild(d);
 });
 
-// JOIN GAME
-window.joinGame = async function () {
-
-  try {
-
-    if(!player){
-      alert("Login missing!");
-      return;
-    }
-
-    alert("Joining game...");
-
-    await set(ref(db,"players/"+player),{
-      name: player,
-      money: 5000,
-      position: 0
-    });
-
-    const turnSnap = await get(ref(db,"turn"));
-
-    if(!turnSnap.exists()){
-      await set(ref(db,"turn"), player);
-    }
-
-    alert("Joined successfully!");
-
-  } catch (error) {
-    console.error(error);
-    alert("Error: " + error.message);
-  }
-
-};
-// 🎲 ROLL WITH TURN SYSTEM
+// JOIN
 window.joinGame = async function () {
 
   if(!player){
@@ -140,26 +98,56 @@ window.joinGame = async function () {
     return;
   }
 
-  alert("Joining game...");
-
   await set(ref(db,"players/"+player),{
     name:player,
     money:5000,
     position:0
   });
 
-  // FIX: set turn only if not exists
   const turnSnap = await get(ref(db,"turn"));
-
   if(!turnSnap.exists()){
     await set(ref(db,"turn"), player);
   }
 
-  alert("Joined successfully!");
+  alert("Joined!");
 };
 
-// 🏠 BUY
+// ROLL
+window.rollDice = async function () {
+
+  const turnSnap = await get(ref(db,"turn"));
+  const currentTurn = turnSnap.val();
+
+  if(currentTurn !== player){
+    alert("Not your turn!");
+    return;
+  }
+
+  let dice = Math.floor(Math.random()*6)+1;
+
+  const snap = await get(ref(db,"players/"+player));
+  let p = snap.val();
+
+  let newPos = (p.position + dice) % 20;
+
+  await update(ref(db,"players/"+player),{
+    position:newPos
+  });
+
+  await checkProperty(newPos);
+
+  const playersSnap = await get(ref(db,"players"));
+  let players = Object.keys(playersSnap.val());
+  let next = players[(players.indexOf(player)+1)%players.length];
+
+  await set(ref(db,"turn"), next);
+
+  alert("Dice: " + dice);
+};
+
+// BUY
 window.buyProperty = async function () {
+
   const snap = await get(ref(db,"players/"+player));
   let p = snap.val();
   let pos = p.position;
@@ -167,6 +155,7 @@ window.buyProperty = async function () {
   const propSnap = await get(ref(db,"properties/"+pos));
 
   if(!propSnap.exists() && p.money >= 500){
+
     await set(ref(db,"properties/"+pos),{
       owner:player
     });
@@ -179,15 +168,15 @@ window.buyProperty = async function () {
   }
 };
 
-// 💰 RENT
+// RENT
 async function checkProperty(pos){
+
   const propSnap = await get(ref(db,"properties/"+pos));
 
   if(propSnap.exists()){
     let prop = propSnap.val();
 
     if(prop.owner !== player){
-      alert("Pay Rent ₹200");
 
       const snap = await get(ref(db,"players/"+player));
       let p = snap.val();
@@ -195,34 +184,29 @@ async function checkProperty(pos){
       await update(ref(db,"players/"+player),{
         money:p.money - 200
       });
+
+      alert("Paid Rent ₹200");
     }
   }
 }
 
-// 🔄 LIVE UPDATE
+// LIVE UPDATE
 onValue(ref(db,"players"), (snap)=>{
-  document.querySelectorAll(".tile").forEach(t=>t.style.background="#333");
+
+  document.querySelectorAll(".tile").forEach(t=>t.innerHTML="");
 
   let data = snap.val();
+
+  if(!data) return;
 
   for(let k in data){
     let p = data[k];
     let tile = document.getElementById("tile"+p.position);
 
-    tile.innerHTML = cities[p.position] + "<br><span class='player'>●</span>";
+    tile.innerHTML = cities[p.position] + "<br>🟡";
   }
 });
 
-// 🟢 SHOW TURN
-onValue(ref(db,"turn"), (snap)=>{
-  let turn = snap.val();
-
-  if(!turn){
-    document.getElementById("turnText").innerText = "Waiting for players...";
-  } else {
-    document.getElementById("turnText").innerText = "Turn: " + turn;
-  }
-});
 </script>
 
 </body>
